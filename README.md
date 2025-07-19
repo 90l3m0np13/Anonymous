@@ -10,11 +10,11 @@
 ## 2.  Audiencia
   -  🛡️ Pentesters y entusiastas de seguridad que buscan practicar:
 
-  -  Enumeración de servicios.
+    -  Enumeración de servicios.
 
-  -  Manipulación de archivos vía FTP.
+    -  Manipulación de archivos vía FTP.
 
-  -  Técnicas de post-explotación (TTY, PrivEsc).
+    -  Técnicas de post-explotación (TTY, PrivEsc).
 
 ##  Advertencia
   -  ⚠️ Úsalo solo en entornos autorizados. La explotación no consentida es ilegal.
